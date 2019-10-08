@@ -1,0 +1,19 @@
+---
+title: "Continuous Covariate"
+output: pdf_document
+---
+
+Some meta-regressions involve continuous covariates. 
+Under the proposed imputation model, generating imputations of continuous covariates will be a little trickier than generating categorical ones. 
+This is because, given $\eta = (\beta, \tau^2)$, we are generating imputations with a probability model 
+\[
+p(X_{mis} | X_{obs}, Y, v, \eta, \psi) \propto p(Y | X, v, \eta)
+\]
+and under the model $-\beta_1 X$ is normally distributed with mean $beta_0 - Y$ and variance $\tau^2 + v$. 
+
+One option is to draw $\eta$ from its posterior, and then draw $Z \sim N(\beta_0 - Y, \tau^2 + v)$. Then $X = Z/-\beta_1$ would conceivably be a draw from the appropriate distribution. 
+
+Alternatively, we could draw a bunch of $X$ from a standard normal distribution, and then resample with probability 
+\[
+\frac{p(Y | X, v, \eta)}{\phi(X)}
+\]
