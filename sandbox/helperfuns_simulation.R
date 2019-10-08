@@ -101,3 +101,59 @@ ampute_df <- function(data,
 # 
 # foo = ampute_df(dat)
 # foo
+
+
+
+#-----------------------------------------------------------#
+#' @name  pool_meta
+#' @param mir object with list of metafor models fit to MICE
+#'            imputations
+#' @return data frame with pooled parameter estimates
+#' @note This is a quick and dirty pooling function that 
+#'       only uses marginal variances and not the entire 
+#'       covariance matrix! 
+#'       You should re-code it later to use the cov. matrix!
+#-----------------------------------------------------------#
+pool_meta = function(mir){
+
+  ### Create tibble with 3 columns:
+  # Column 1 is the analyses run on each MI dataset
+  analysis_results = tibble(analyses = mir$analyses) %>% 
+    # Column 2 is a dataframe of point estimates for each MI dataset
+    mutate(ests = map(.x = analyses, 
+                      .f = function(x){
+                        data.frame(param = c(row.names(x$beta), "tau2"),
+                                   value = c(x$beta, x$tau2), 
+                                   stat = "estimate")
+                        
+                      }), 
+           ### Column 3 is a dataframe of variances for each MI dataset
+           vars = map(.x = analyses, 
+                      .f = function(x){
+                        data.frame(param = c(row.names(x$beta), "tau2"),
+                                   value = c(x$se^2, x$se.tau2^2), 
+                                   stat = "variance")
+                      })) 
+  
+  
+  # Create a data frame that takes the mean within-df variances
+  within_vals = do.call(rbind, analysis_results$vars) %>%
+    group_by(param) %>%
+    summarize(Ubar = mean(value))
+  
+  # Create a data frame that gives the pooled point estimates
+  # and takes the variance between datasets
+  between_vals = do.call(rbind, analysis_results$ests) %>%
+    group_by(param) %>% # for each parameter
+    summarize(est = mean(value), # get the mean across dfs
+              B = var(value)) # get the between-df variance
+  
+  # Join the within- and between- results  
+  out = left_join(between_vals, within_vals) %>%
+    mutate(var = B + B/length(analysis_results$analyses) + Ubar, # formula for pooling variances
+           se = sqrt(var)) # get standard error
+  
+  return(out %>% dplyr::select(param, est, var, se, B, Ubar))
+}
+  
+
