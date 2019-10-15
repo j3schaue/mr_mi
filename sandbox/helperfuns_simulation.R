@@ -155,5 +155,3 @@ pool_meta = function(mir){
   
   return(out %>% dplyr::select(param, est, var, se, B, Ubar))
 }
-  
-

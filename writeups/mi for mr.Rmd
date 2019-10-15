@@ -29,9 +29,41 @@ OVAAT is only appropriate when covariates are completely independent and data ar
 
 # Multiple Imputation
 
-If we're already assuming data are MAR, why not use MI?
+Suppose we are insterested in estimating some quantity $\eta$, such as the regression coefficients or the variance component in the meta-regression model.
+If we are not missing any data, then there are methods for estimating $\eta$, including weighted least squares (WLS). 
+Denote $\hat{\eta}$ as the estimate of $\eta$ and $\hat{V}[\hat{\eta}]$ as the estimated variance of $\hat{\eta}$.
+However, in practice, we may be missing some data, and in this article, we assume that one or more covariates of an effect estimate may be missing.
 
-Show pooling formulas.
+MI works by filling in those missing values with a variety values that we might have observed had not data been missing. 
+The model used to fill in those missing values is called the \textit{impuation model}.
+This effectively creates $m$ complete datasets where any missing values have been imputed.
+Analyses are then conducted on each of the imputed datasets, and their results are pooled (see Rubin, 1987; Schaefer, 1997).
+
+Denote $\hat{\eta}^{(i)}$ as the estimate of $\eta$ from the $i$th imputed dataset, and let $\hat{V}[\hat{\eta}^{(i)}]$ be its estimated variance. 
+For instance, $\hat{\eta}^{(i)}$ and $\hat{V}[\hat{\eta}^{(i)}]$ may arise from the same WLS approach as $\hat{\eta}$ and $\hat{V}[\hat{\eta}]$.
+Then, the MI estimate of $\eta$ is given by
+\begin{equation}\label{eq:miest}
+\hat{\eta}_{MI} = \sum_{i = 1}^m \frac{\hat{\eta}^{(i)}}{m}
+\end{equation}
+
+The variance of this estimator is given by 
+\begin{align}
+\bar{U}_m &= \sum_{i=1}^m \frac{\hat{V}[\hat{\eta}^{(i)}]}{m} \label{eq:um}\\
+B_m &= \sum_{i=1}^m \frac{(\hat{\eta}^{(i)} - \hat{\eta}_{MI})^2}{m-1} \label{eq:bm}\\
+\hat{V}[\hat{\eta}_{MI}] &= \bar{U}_m + \left(1 + \frac{1}{m}\right) B_m \label{eq:mivar}
+\end{align}
+
+Various researchers have discussed methods for constructing confidence intervals based on equations (\ref{eq:miest}--\ref{eq:mivar}). 
+Rubin (1987) proposed using the normal distribution for constructing confidence intervals of the form
+\[
+\hat{\eta}_{MI} \pm z_{1 - \alpha/2} \sqrt{\hat{V}[\hat{\eta}_{MI}]}
+\]
+where $z_{x}$ is the $x$th percentile of the standard normal distribution.
+Alternatively, one may also use a reference $t$-distribution to construct confidence intervals of the form
+\begin{equation}\label{eq:tci}
+\hat{\eta}_{MI} \pm t_{\nu, 1 - \alpha/2} \sqrt{\hat{V}[\hat{\eta}_{MI}]}, \quad \nu = (m - 1)\left(1 + \frac{m}{m+1}\frac{\bar{U}_m}{B_m}\right)
+\end{equation}
+where $t_{a, b}$ is the $b$th percentile of the $t$-distribution with $a$ degrees of freedom, and the expression for the degrees of freedom is given above.
 
 
 # Justifications for MI
@@ -94,7 +126,7 @@ where $\gamma$ is the parameter that describes the distribution of $X | T, v$:
 \[
 p(\gamma | T, X_{obs}, v) \propto p(X_{obs} | T, v, \gamma)  p(\gamma)
 \]
-Note that 
+Note that the result by Bartlett et al. implies that $\gamma = \eta$.
 
 When $X$ is categorical with $j = 1, \ldots, c$ categories, then we may model it as multinomial. 
 Using the result in () above, this means that 
