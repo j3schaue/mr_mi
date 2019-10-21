@@ -3,7 +3,11 @@
 # missing data.
 # 
 # (It's probably going to have a lot of notes to myself and
+<<<<<<< HEAD
 # not make much sense, haha, ignore me!)
+=======
+# not make much sense, haha.)
+>>>>>>> b53b8695769625186eac00363a149420c442f99f
 
 # Source the functions file:
 source("sandbox/imputation_functions.R")
