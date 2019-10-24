@@ -3,11 +3,7 @@
 # missing data.
 # 
 # (It's probably going to have a lot of notes to myself and
-<<<<<<< HEAD
 # not make much sense, haha, ignore me!)
-=======
-# not make much sense, haha.)
->>>>>>> b53b8695769625186eac00363a149420c442f99f
 
 # Source the functions file:
 source("sandbox/imputation_functions.R")
@@ -92,7 +88,7 @@ inds <- which(is.na(df$x))
 comp_df_x <- comp_df %>% 
   select(-y, -v) # That is, creating a matrix of COMPLETE predictors.
 
-# Count the number of predictors (here, 3):
+# Count the number of predictors (here, 1):
 nx <- ncol(comp_df_x)
 
 # This next bit creates dummy-coded variables FROM
@@ -133,3 +129,52 @@ post <- get_posterior_stan(t = comp_df$y,
 # Although it just now occured to me I think this code matches
 # one categorical predictor, so it may not have known how to handle
 # the others. Going to go back up and drop them.
+
+# m is specified in the big function, default of 5
+# I think it's the number of multiple imputations
+# (5 matches the default for mice)
+m <- 5
+params <- post %>%
+sample_n(m) %>% # takes a random sample of m rows
+  mutate(tau2 = tau^2) %>% # calculates tau-squared
+  select_if(grepl("tau2|beta|alpha", names(.))) # selecting only those parameters (excluding the thetas)
+
+dfs <- list()
+
+# Posterior draws of coefficients as a matrix
+post_betas <- params %>% 
+  select_if(grepl("alpha|beta", names(.))) %>%
+  as.matrix()
+
+for(i in 1:m){
+  
+  tau2 <- params$tau2[i]
+  tmp <- mis_df %>%
+    select(y, v)
+  
+  xMatrix <- sapply(1:nrow(tmp), 
+                   FUN = function(j) draw_x_cat(t = tmp$y[j], 
+                                                v = tmp$v[j], 
+                                                beta = post_betas[i,],
+                                                tau2 = tau2)) %>%
+    t()
+  
+  Xvals <- sapply(1:nrow(xMatrix), 
+                 FUN = function(i){
+                   xx = xMatrix[i,]
+                   if(sum(xx) == 0){
+                     return(0)
+                   } else{
+                     return(which(xx == 1) - 1)
+                   }
+                 })
+  
+  imp_df <- tmp %>%
+    mutate(x = Xvals)
+  
+  # imp_df$x <- as.factor(imp_df$x) # Note; this should match what comp_df$x is,
+  # otherwise it'll throw an error when binding rows in the next command.
+  
+  dfs[[i]] <- bind_rows(comp_df, imp_df)
+  
+}
