@@ -63,6 +63,7 @@ mi_mods <- with(bd_mice,
                     method = "PM"))
 
 # pool the estimates using Rubin's rules
+eval(metafor:::.mice)
 pool(mi_mods) 
 # UH OH! There's an error when we call pool()--a MICE function--mi_mods--a list of metafor objects
 # Try updating metafor (since it's supposed to work with MICE)
