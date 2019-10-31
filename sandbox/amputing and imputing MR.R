@@ -64,14 +64,7 @@ mi_mods <- with(bd_mice,
 
 # pool the estimates using Rubin's rules
 eval(metafor:::.mice)
-pool(mi_mods) 
-# UH OH! There's an error when we call pool()--a MICE function--mi_mods--a list of metafor objects
-# Try updating metafor (since it's supposed to work with MICE)
-# devtools::install_github("wviechtb/metafor")
-# Github version doesn't work!
-# Quick function for pooling models in  helperfuns file
-source("./sandbox/helperfuns_simulation.R")
-pooled_models <- pool_meta(mi_mods)
+pooled_models <- pool(mi_mods) 
 
 
 
