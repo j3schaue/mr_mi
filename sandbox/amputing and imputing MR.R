@@ -69,7 +69,7 @@ pooled_models <- pool(mi_mods)
 
 
 ### Compare MICE to MR model
-pooled_models
+pooled_models$pooled %>% mutate(se = sqrt(t))
 full_model
 cc_model
 

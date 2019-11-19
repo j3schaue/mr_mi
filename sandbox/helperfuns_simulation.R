@@ -118,7 +118,12 @@ pool_meta = function(mir){
 
   ### Create tibble with 3 columns:
   # Column 1 is the analyses run on each MI dataset
-  analysis_results = tibble(analyses = mir$analyses) %>% 
+  if(is.mira(mir)){
+    analysis_results = tibble(analyses = mir$analyses)
+  } else {
+    analysis_results = tibble(analyses = mir$analyses)
+  }
+  analysis_results %>% 
     # Column 2 is a dataframe of point estimates for each MI dataset
     mutate(ests = map(.x = analyses, 
                       .f = function(x){

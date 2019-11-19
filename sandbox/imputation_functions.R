@@ -12,6 +12,39 @@ require(fastDummies)
 require(tidyverse)
 require(rstan)
 
+
+#-------------------------------------------------------#
+#-------------------------------------------------------#
+factor_to_dummy <- function(data, var){
+  
+  other_vars = data %>% select(-var)
+  dummy = data %>% select(var) %>%
+    fastDummies::dummy_cols(remove_first_dummy = TRUE) %>%
+    select(-var) %>%
+    cbind(other_vars, .)
+  levs = levels(data[[var]])
+  
+  return(list(data=dummy, levels=levs))
+
+}
+
+
+dummy_to_factor <- function(data, var, levels){
+  
+  other_vars = data %>% select_if(!grepl(var, names(data)))
+  
+  dummy_codes = data %>% 
+    select_if(grepl(var, names(data)))
+  
+  fct_var = factor(as.matrix(dummy_codes) %*% 1:I(length(levels) - 1), labels = levels)
+  
+  other_vars[[var]] = fct_var
+  
+  return(other_vars)
+}
+
+
+
 #-------------------------------------------------------#
 #' @name mr_likelihood
 #' @param t double, effect estimate
@@ -21,6 +54,8 @@ require(rstan)
 #' @param beta vector of regression coefficients
 #' @param tau2 double, random effect variance
 #' @return value of the likelihood function
+#' @note the vector 'x' does not include an intercept
+#'       column for input. This is appended afterward.
 #-------------------------------------------------------#
 mr_likelihood = function(t, v, x, beta, tau2){
   
@@ -97,6 +132,15 @@ draw_x_cat = function(t, v, beta, tau2){
   return(xvec)
 }
 
+
+#-------------------------------------------------------#
+#-------------------------------------------------------#
+draw_x_cts <- function(t, v, beta, tau2){
+  
+  z = rnorm(1, beta[1] - t, sqrt(v + tau2))
+  return(-z/beta[1])
+  
+}
 
 
 #-------------------------------------------------------#
@@ -178,68 +222,89 @@ get_posterior_stan = function(t, x, v, fixed = FALSE){
 
 #-------------------------------------------------------#
 #-------------------------------------------------------#
-impute_x_cat = function(df, m = 5, fixed = FALSE,
-                        true_beta = FALSE, 
-                        beta = NULL, tau2 = NULL){
+prep_df <- function(data, categorical = TRUE){
   
   # Sort out the data that is missing vs. not missing
-  comp_df = df %>% drop_na()
-  mis_df = df %>% setdiff(comp_df)
-  inds = which(is.na(df$x)) # get missing data indices
+  comp_df = data %>% drop_na()
+  mis_df = data %>% setdiff(comp_df)
+  inds = which(is.na(data$x)) # get missing data indices
   
-  ###---Prep the predictor matrix
   # Select only the predictors
   comp_df_x = comp_df %>% 
     select(-y, -v)
   
-  # Get the # of predictors
-  nx = ncol(comp_df_x)
+  if(categorical){
+    
+    if(sort(unique(comp_df$x)) != c(0, 1)){
+      ## STUFF FOR DUMMY CODING
+      
+      # Get the # of predictors
+      nx = ncol(comp_df_x)
+      
+      # Create dummy codes
+      comp_df_x = comp_df_x %>% 
+        fastDummies::dummy_cols(remove_first_dummy = TRUE)
+      
+      # Get updated column count
+      ncx = ncol(comp_df_x)
+      
+      # Select only the dummy-coded variables
+      comp_df_x = comp_df_x[, (nx + 1):ncx] %>%
+        as.matrix()
+    }
+    
+  }
+    
+  return(list(comp_df = comp_df, mis_df = mis_df, comp_df_x = comp_df_x, inds = inds))
+}
+
+
+#-------------------------------------------------------#
+#' @name impute_x_onevar
+#' @param df, data frame
+#' @param m, number of imputations
+#' @param fixed, boolean, indicates fixed-effects model
+#' @param true_beta, boolean, simulation check allows
+#'             us to use the true tau2
+#' @param beta, vector             
+#-------------------------------------------------------#
+impute_x_onevar = function(data, m = 5, fixed = FALSE,
+                    categorical = TRUE, 
+                    beta = NULL, tau2 = NULL){
   
-  # Create dummy codes
-  comp_df_x = comp_df_x %>% 
-    fastDummies::dummy_cols(remove_first_dummy = TRUE)
+  ###---Prep the DF
+  prepped <- prep_df(data)
+  comp_df_x = prepped$comp_df_x
+  comp_df = prepped$comp_df
+  mis_df = prepped$mis_df
+  inds = prepped$inds
+
+    
+  ###---Get the posterior of the MR parameters
+  post = get_posterior_stan(t = comp_df$y, 
+                            x = comp_df_x, 
+                            v = comp_df$v, 
+                            fixed = fixed)
   
-  # Get updated column count
-  ncx = ncol(comp_df_x)
-  
-  # Select only the dummy-coded variables
-  comp_df_x = comp_df_x[, (nx + 1):ncx] %>%
-    as.matrix()
-  
-  
-  if(true_beta){
-    # Ignore this, for simulations only.
-    params = data.frame(beta0 = rep(beta_0, m),
-                        beta1 = rep(beta_1, m),
-                        tau2 = rep(tau2, m))
+  if(fixed){
+    
+    # Extract parameters into a DF
+    params = post %>%
+      sample_n(m) %>%
+      select_if(grepl("alpha|beta", names(.))) %>%
+      mutate(tau2 = 0)
     
   } else {
     
-    # Get the posterior of the MR parameters
-    post = get_posterior_stan(t = comp_df$y, 
-                              x = comp_df_x, 
-                              v = comp_df$v, 
-                              fixed = fixed)
-    
-    if(fixed){
-      
-      # Extract parameters into a DF
-      params = post %>%
-        sample_n(m) %>%
-        select_if(grepl("alpha|beta", names(.)))
-      
-    } else {
-      
-      params = post %>%
-        sample_n(m) %>%
-        mutate(tau2 = tau^2) %>%
-        select_if(grepl("tau2|beta|alpha", names(.)))
-      
-    }
-    
+    params = post %>%
+      sample_n(m) %>%
+      mutate(tau2 = tau^2) %>%
+      select_if(grepl("tau2|beta|alpha", names(.)))
     
   }
+    
   
+  ###---Generate imputations
   dfs = list()
   
   # Posterior draws of coefficients as a matrix
@@ -247,38 +312,48 @@ impute_x_cat = function(df, m = 5, fixed = FALSE,
     select_if(grepl("alpha|beta", names(.))) %>%
     as.matrix()
   
+  # Generate m imputed datasets
   for(i in 1:m){
     
-    if(fixed){
-      tau2 = 0
-    } else {
-      tau2 = params$tau2[i]
-    }
-    
+    # get the data that are missing covariates
     tmp = mis_df %>%
       select(y, v) 
     
-    xMatrix = sapply(1:nrow(tmp), 
-                     FUN = function(j) draw_x_cat(t = tmp$y[j], 
-                                                v = tmp$v[j], 
-                                                beta = post_betas[i,],
-                                                tau2 = tau2)) %>%
-      t()
-    
-    Xvals = sapply(1:nrow(xMatrix), 
-                   FUN = function(i){
-                     xx = xMatrix[i,]
-                     if(sum(xx) == 0){
-                       return(0)
-                     } else{
-                       return(which(xx == 1) - 1)
-                     }
-                   })
-    
+    if(categorical){
+      # Draw all of the xs as a matrix
+      xMatrix = sapply(1:nrow(tmp), 
+                       FUN = function(j){
+                         draw_x_cat(t = tmp$y[j], 
+                                    v = tmp$v[j], 
+                                    beta = post_betas[i,],
+                                    tau2 = params[i, "tau2"])}
+                       ) %>%
+        t()
+      
+      # Convert the matrix of imputed dummy variables into a factor
+      Xvals = sapply(1:nrow(xMatrix), 
+                     FUN = function(k){
+                       xx = xMatrix[k,]
+                       if(sum(xx) == 0){
+                         return(0)
+                       } else{
+                         return(which(xx == 1) - 1)
+                       }
+                     })
+    } else {
+      
+      Xvals = sapply(1:nrow(tmp), 
+                     FUN = function(i){
+                       draw_x_cts(t = tmp$y[j], 
+                                  v = tmp$v[j], 
+                                  beta = post_betas[i,], 
+                                  tau2 = params[i, "tau2"])
+                     })
+      
+    }
+      
     imp_df = tmp %>%
       mutate(x = Xvals)
-    
-    imp_df$x = as.factor(imp_df$x)
     
     dfs[[i]] = bind_rows(comp_df, imp_df)
   }
