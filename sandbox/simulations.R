@@ -19,7 +19,7 @@ bd <- bd %>%
   na.omit()
 
 ##-----------MCAR SIMS
-nsims = 2
+nsims = 100
 m = 5
 props = c(0.2, 0.5, 0.75)
 mcar_results = list()
@@ -75,7 +75,7 @@ for(i in seq(props)){
   }
 }
 
-
+saveRDS(mcar_results, "./sandbox/simulation_results/mcar_sims.RDS")
 
 
 ##-----------MCAR SIMS
@@ -132,3 +132,4 @@ for(i in seq(props)){
   }
 }
 
+saveRDS(mar_results, "./sandbox/simulation_results/mar_sims.RDS")
