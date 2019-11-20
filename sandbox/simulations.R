@@ -4,6 +4,7 @@
 ###--------------------------------------------------------###
 ###--------------------------------------------------------###
 
+library(rstan)
 library(mice)
 library(metafor)
 library(tidyverse)
@@ -19,7 +20,7 @@ bd <- bd %>%
   na.omit()
 
 ##-----------MCAR SIMS
-nsims = 100
+nsims = 2
 m = 5
 props = c(0.2, 0.5, 0.75)
 mcar_results = list()

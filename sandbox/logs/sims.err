@@ -1,0 +1,50 @@
+Loading required package: StanHeaders
+Loading required package: ggplot2
+rstan (Version 2.19.2, GitRev: 2e1f913d3ca3)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+options(mc.cores = parallel::detectCores()).
+To avoid recompilation of unchanged Stan programs, we recommend calling
+rstan_options(auto_write = TRUE)
+Loading required package: lattice
+
+Attaching package: ‘mice’
+
+The following objects are masked from ‘package:base’:
+
+    cbind, rbind
+
+Loading required package: Matrix
+Loading 'metafor' package (version 2.1-0). For an overview 
+and introduction to the package please type: help(metafor).
+── Attaching packages ─────────────────────────────────────── tidyverse 1.2.1 ──
+✔ tibble  2.1.1       ✔ purrr   0.3.2  
+✔ tidyr   0.8.3       ✔ dplyr   0.8.0.1
+✔ readr   1.3.1       ✔ stringr 1.4.0  
+✔ tibble  2.1.1       ✔ forcats 0.4.0  
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ tidyr::complete() masks mice::complete()
+✖ tidyr::expand()   masks Matrix::expand()
+✖ tidyr::extract()  masks rstan::extract()
+✖ dplyr::filter()   masks stats::filter()
+✖ dplyr::lag()      masks stats::lag()
+Loading required package: fastDummies
+
+ *** caught segfault ***
+address 0x20, cause 'memory not mapped'
+
+Traceback:
+ 1: Module(module, mustStart = TRUE)
+ 2: .getModulePointer(x)
+ 3: new("Module", .xData = <environment>)$stan_fit4model5f0263dbc7b3_a086f406029ec05b0c98dcbeda693e3b
+ 4: new("Module", .xData = <environment>)$stan_fit4model5f0263dbc7b3_a086f406029ec05b0c98dcbeda693e3b
+ 5: eval(call("$", mod, paste("stan_fit4", model_cppname, sep = "")))
+ 6: eval(call("$", mod, paste("stan_fit4", model_cppname, sep = "")))
+ 7: object@mk_cppmodule(object)
+ 8: .local(object, ...)
+ 9: sampling(sm, data, pars, chains, iter, warmup, thin, seed, init,     check_data = TRUE, sample_file = sample_file, diagnostic_file = diagnostic_file,     verbose = verbose, algorithm = match.arg(algorithm), control = control,     check_unknown_args = FALSE, cores = cores, open_progress = open_progress,     include = include, ...)
+10: sampling(sm, data, pars, chains, iter, warmup, thin, seed, init,     check_data = TRUE, sample_file = sample_file, diagnostic_file = diagnostic_file,     verbose = verbose, algorithm = match.arg(algorithm), control = control,     check_unknown_args = FALSE, cores = cores, open_progress = open_progress,     include = include, ...)
+11: stan(model_code = stan_mod, data = data, iter = 1000, chains = 4)
+12: get_posterior_stan(t = comp_df$y, x = comp_df_x, v = comp_df$v,     fixed = fixed)
+13: impute_x_onevar(data)
+An irrecoverable exception occurred. R is aborting now ...
+/var/spool/slurmd/job3299295/slurm_script: line 17: 24322 Segmentation fault      (core dumped) Rscript ./sandbox/simulations.R
