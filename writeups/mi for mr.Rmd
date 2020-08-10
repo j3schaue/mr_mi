@@ -1,177 +1,434 @@
 ---
 title: "Compatible Imputation of Missing Covariates in a Meta-Regression"
 author: "Jacob M. Schauer"
-output: pdf_document
+csl: ./addons/apa.csl
+output:
+  bookdown::pdf_document2:
+    fig_caption: yes
+    includes:
+      in_header: ./addons/style.sty
+    toc: no
+  bookdown::word_document2:
+    reference_docx: ./addons/styles_word.docx
 ---
 
 
 # Introduction
 
-Why do we need MI, and why do we need adaptations for MR
+Meta-regression analyses frequently contend with missing covariates.
+This can occur if researchers do not report aspects of their study (e.g., sample composition), or if their reporting does not align with how variables are extracted or coded.
+How best to handle missing covariates will largely depend on why they are missing.
+Multiple imputation (MI) is a somewhat flexible approach to analyses of incomplete data that has become popular in a variety of fields. 
+Though it has yet to find broad use in meta-analysis, there has been some initial research into its potential applications in systematic reviews.
+
+MI divides the process of analysis with missing data into two steps. 
+First, missing values are filled in with random draws from an *imputation model*. 
+Multiple values are imputed for each missing field, which creates a series of "complete" datasets.
+Second, these datasets are analyzed individually by fitting a *substantive model* (i.e., the meta-regression model), and those results are then pooled across datasets to compute point estimates and standard errors.
+
+The accuracy of inferences generated through MI will depend on a number of factors, including the imputation model.
+When an imputation model is incorrectly specified, it can lead to biased estimators, incorrect standard errors, and/or confidence intervals with poor coverage probabilities.
+In the context of meta-regression with missing covariates, this can occur if the imputation model is incompatible with the  meta-regression model.
+However, which imputation models for covariates are compatible with meta-regression models has not been explicitly studied in the literature. 
+Nor does there appear to be any implementation of compatible imputations of missing covariates in a meta-regression in most commonly available software.
+
+This article extends existing findings on compatible imputations of covariates to meta-regression models.
 
 
-# Example & Model
 
-Give an example of a dataset one might use.
+# Example
 
-Point out that many common statistical corrections and software assume data are MAR/MCAR, and say what those mean.
-
-
-## Status Quo: Complete Cases & OVAAT
-
-Note that that the most common way to handle missing data is doing complete cases/one variable at a time (OVAAT).
-
-Complete case analyses are only unbiased if the data are MCAR.
-
-OVAAT is only appropriate when covariates are completely independent and data are MCAR.
+[HOLD FOR SA INTERVENTION EXAMPLE]
 
 
+# Model and Notation
 
-# Multiple Imputation
+In this article, we assume effects in a meta-analysis are independent.
+Suppose there are $k$ effects $\theta_1, \ldots, \theta_k$ of interest in a meta-regression. 
+Let $T_i$ be the estimate of the $i$th effect. 
+A common assumption in meta-analysis is that $T_i$ is unbiased and normally distributed with known variance $v_i$.
+This is exactly true for some effect size indices, and is a very accurate approximation for others.
+Finally, let $X_i = [X_{i1}, \ldots, X_{ip}]$ be a vector of covariates for the $i$th effect.
+Then, we can write the standard mixed-effects meta-regression model as:
+\begin{equation}
+T_i = \beta_0 + \beta_1 X_{i1} + \ldots + \beta_p X_{ip} + e_i + u_i
+\label{eq:meta-regression}
+\end{equation}
+Here, $\beta_j$ are the regression coefficients, $e_i$ is the estimation error for effect $i$, and $u_i$ is the random effect.
+Note that we assume that $e_i \sim N(0, v_i)$, $u_i \sim N(0, \tau^2)$, and that $e_i \perp u_i$.
+The model in (\ref{eq:meta-regression}) is equivalent to the standard mixed-effects meta-regression model, and it contains to sources of variance, $v_i$ is the variance of the estimation error $e_i$ and $\tau^2$ is the variation of the $\theta_i$ around the regression line.
 
-Suppose we are insterested in estimating some quantity $\eta$, such as the regression coefficients or the variance component in the meta-regression model.
-If we are not missing any data, then there are methods for estimating $\eta$, including weighted least squares (WLS). 
-Denote $\hat{\eta}$ as the estimate of $\eta$ and $\hat{V}[\hat{\eta}]$ as the estimated variance of $\hat{\eta}$.
-However, in practice, we may be missing some data, and in this article, we assume that one or more covariates of an effect estimate may be missing.
+The substantive model in a meta-regression concerns the distribution of effect estimate $T$ given the covariates $X$ and estimation error variance $v$.
+The parameters that index this model are the regression coefficients $\beta = [\beta_0, \ldots, \beta_p]$ and the variance component $\tau^2$.
+Denote $\eta$ as the parameter(s) of interest, so that $\eta = [\beta, \tau^2]$.
+Then we may write $p(T | X, v, \eta)$, which we will refer to as the *substantive model* but is also referred to in missing data literature as the *complete-data model*.
+There is a substantial literature on how to estimate meta-regression models when no data are missing, including weighted least-squares estimators to estimate $\beta$, and a variety of methods for estimating $\tau^2$.
 
-MI works by filling in those missing values with a variety values that we might have observed had not data been missing. 
-The model used to fill in those missing values is called the \textit{impuation model}.
-This effectively creates $m$ complete datasets where any missing values have been imputed.
-Analyses are then conducted on each of the imputed datasets, and their results are pooled (see Rubin, 1987; Schaefer, 1997).
-
-Denote $\hat{\eta}^{(i)}$ as the estimate of $\eta$ from the $i$th imputed dataset, and let $\hat{V}[\hat{\eta}^{(i)}]$ be its estimated variance. 
-For instance, $\hat{\eta}^{(i)}$ and $\hat{V}[\hat{\eta}^{(i)}]$ may arise from the same WLS approach as $\hat{\eta}$ and $\hat{V}[\hat{\eta}]$.
-Then, the MI estimate of $\eta$ is given by
-\begin{equation}\label{eq:miest}
-\hat{\eta}_{MI} = \sum_{i = 1}^m \frac{\hat{\eta}^{(i)}}{m}
+Under the assumptions above, the likelihood for a single effect can be written as:
+\begin{equation}
+p(T | X, v, \eta) = \frac{1}{\sqrt{2 \pi (\tau^2 + v)}} e^{-\frac{(T - \beta_0 - \ldots - \beta_p X_{p})^2}{2(\tau^2 + v)}}
+\label{eq:meta-regression-likelihood}
 \end{equation}
 
-The variance of this estimator is given by 
+Let $R = [R_{1}, \ldots, R_{p}]$ be a $p$-dimensional vector of response indicators for the covariates in $X$. 
+This means that $R_{j} = 1$ if $X_{j}$ is observed and $R_{j} = 0$ if $X_{j}$ is missing.
+For a given effect, the set of observed covariates is $O = \{j : R_{j} = 1\}$ and missing covariates is $M = \{j: R_{j} = 0\}$.
+Note that the substantive meta-regression model can be written:
+\begin{equation}
+p(T | X, v, \eta) = p(T | X_O, X_M, v, \eta)
+\label{eq:complete-data-model}
+\end{equation}
+In (\ref{eq:complete-data-model}), we see that the model depends on both the observed covariates $X_O$ and the unobserved covariates $X_M$.
+
+How to handle estimating a meta-regression model with missing covariates will depend on why covariates are missing, often referred to as the *missingness mechanism*. 
+The missingness mechanism is typically defined in terms of the distribution of $R$. 
+Let $\xi$ index the distribution of $R$ given the observed and unobserved data: $p(R | T, X_O, X_M, v, \xi)$. 
+In this article, we assume that covariates are missing at random, so that $p(R | T, X_O, X_M, v, \xi) = p(R | T, X_O, v, \xi)$.
+This is a standard assumption of many missing data methods, including multiple imputation.
+However, we note that multiple imputation can still provide accurate inferences if the imputation model takes into account the distribution of $R$.
+
+
+
+
+
+## Multiple Imputation
+
+To simplify discussion of imputation, we focus on estimating a single parameter $\zeta \in \eta$ $\zeta \in \eta$, such as a regression coefficient or the variance component in the meta-regression model.
+Note, however, the principles presented in this section can be extended to estimating the vector of parameters $\eta$.
+MI works by filling in missing values---in this case, missing covariates---with draws from an imputation model.
+The imputation model, in some sense, reflects what we might have observed had data *not* been missing. 
+This process effectively creates $m$ "complete" datasets such that any missing values have been imputed.
+Analyses are then conducted on each of the imputed datasets, and their results are pooled (see Rubin, 1987; Schaefer, 1997).
+
+Denote $\hat{\zeta}^{(i)}$ as the estimate of $\zeta$ from the $i$th imputed dataset, and let $\hat{V}[\hat{\zeta}^{(i)}]$ be its estimated variance. 
+Then, the MI estimate of $\zeta$ is given by the average of the $\hat{\zeta}^{(i)}$:
+\begin{equation}
+\hat{\zeta}_{MI} = \sum_{i = 1}^m \frac{\hat{\zeta}^{(i)}}{m}
+\label{eq:miest}
+\end{equation}
+
+The variance of this estimator is is a function of the variances of each estimate $\hat{V}[\hat{\zeta}^{(i)}]$, as well as the variance between estimates. If we denote the following quantities
 \begin{align}
-\bar{U}_m &= \sum_{i=1}^m \frac{\hat{V}[\hat{\eta}^{(i)}]}{m} \label{eq:um}\\
-B_m &= \sum_{i=1}^m \frac{(\hat{\eta}^{(i)} - \hat{\eta}_{MI})^2}{m-1} \label{eq:bm}\\
-\hat{V}[\hat{\eta}_{MI}] &= \bar{U}_m + \left(1 + \frac{1}{m}\right) B_m \label{eq:mivar}
+\bar{U}_m &= \sum_{i=1}^m \frac{\hat{V}[\hat{\zeta}^{(i)}]}{m} \label{eq:um}\\
+B_m &= \sum_{i=1}^m \frac{(\hat{\zeta}^{(i)} - \hat{\zeta}_{MI})^2}{m-1} \label{eq:bm}\\
 \end{align}
+then the variance of $\hat{\zeta}_{MI}$ is given by:
+\begin{equation}
+\hat{V}[\hat{\zeta}_{MI}] = \bar{U}_m + \left(1 + \frac{1}{m}\right) B_m 
+\label{eq:mivar}
+\end{equation}
 
 Various researchers have discussed methods for constructing confidence intervals based on equations (\ref{eq:miest}--\ref{eq:mivar}). 
 Rubin (1987) proposed using the normal distribution for constructing confidence intervals of the form
 \[
-\hat{\eta}_{MI} \pm z_{1 - \alpha/2} \sqrt{\hat{V}[\hat{\eta}_{MI}]}
+\hat{\zeta}_{MI} \pm z_{1 - \alpha/2} \sqrt{\hat{V}[\hat{\zeta}_{MI}]}
 \]
 where $z_{x}$ is the $x$th percentile of the standard normal distribution.
 Alternatively, one may also use a reference $t$-distribution to construct confidence intervals of the form
 \begin{equation}\label{eq:tci}
-\hat{\eta}_{MI} \pm t_{\nu, 1 - \alpha/2} \sqrt{\hat{V}[\hat{\eta}_{MI}]}, \quad \nu = (m - 1)\left(1 + \frac{m}{m+1}\frac{\bar{U}_m}{B_m}\right)
+\hat{\zeta}_{MI} \pm t_{\nu, 1 - \alpha/2} \sqrt{\hat{V}[\hat{\zeta}_{MI}]}, \quad \nu = (m - 1)\left(1 + \frac{m}{m+1}\frac{\bar{U}_m}{B_m}\right)
 \end{equation}
 where $t_{a, b}$ is the $b$th percentile of the $t$-distribution with $a$ degrees of freedom, and the expression for the degrees of freedom is given above.
 
+Various researchers have studied conditions under which MI provides accurate inferences. 
+While there are several assumptions, including about the missing data mechanism, two key conditions concern the imputation and substantive models.
+If both the imputation and substantive models are correctly specified, then MI provides valid and accurate inferences.
+In this article, we assume that the substantive model is correctly specified.
 
-# Justifications for MI
 
-The original derivation of MI assumed a Bayesian approach to analysis (Rubin, 1987) and is explained nicely by Murray (2018). 
-The idea behind the Bayesian approach to MI is that we are after the posterior distribution
+## Generating Imputations
+
+There is a vast literature on methods for generating imputations.
+In general, observed values are typically used to build models to predict unobserved variables, and then those models are used to randomly generate imputations.
+In the context of meta-regression, we might use effect estimates $T$, variances $v$, and observed covariates $X_O$ to predict values of unobserved covariates $X_M$. 
+
+In particular, we are interested in the predictive distribution
+\[
+p(X_M | X_O, T, v)  \equiv p(x | X_O, T, v)
+\]
+There are various ways to specify this distribution, and for the sake of simplicity, we present a general parametric approach.
+Let $\gamma$ denote the parameters that index the distribution of $X$.
+Then the imputation model is given by:
 \begin{equation}
-\label{eq:bayesjust}
-p(\eta | Y, X_{obs}, v) = \int p(\eta | Y, X_{obs}, X_{mis}, v) p(X_{mis} | Y, X_{obs}, v) dX_{mis}
+p(X_M | X_O, T, v) = \int p(X_M | X_O, T, v, \gamma) p(\gamma | X_O, T, v) d\gamma
+\label{eq:ppd}
 \end{equation}
-More specifically, we may wish to the posterior mean and variance:
-\begin{align}
-E[\eta | Y, X_{obs}, v] & = E[E[\eta | Y, X_{obs}, X_{mis}, v] | Y, X_{obs}, v]\\
-V[\eta | Y, X_{obs}, v] & = E[V[\eta | Y, X_{obs}, X_{mis}, v] | Y, X_{obs}, v] + V[E[\eta | Y, X_{obs}, X_{mis}, v] | Y, X_{obs}, v]\\
-\end{align}
-Generating the missing values $X_{mis}$ via Monte Carlo estimates means that the statistics involve in computing quantities in MI are Monte Carlo estimates of the posterior mean and variance. 
+Here, $p(X_M | X_O, T, v, \gamma)$ is the imputation model indexed by $\gamma$, and $p(\gamma | X_O, T, v)$ is the posterior distribution of $\gamma$ given the observed data.
 
-From a frequentist perspective, suppose that a inferences using the complete data are confidence valid, which means that confidence intervals have the proper coverage probabilities (i.e., a 95% CI has a 95% coverage probability). 
-Then, MI will also be valid if inferences based on it are also confidence valid. 
-Assuming that estimates of $\eta$ are (asymptotically) normal, then this would require 
-\begin{align}
-E[\hat{\eta}] & = \eta\\
-E[\hat{U}] & \geq Var[\hat{\eta}]
-\end{align}
+Imputations can be generated (\ref{eq:ppd}) by the method of composition. To generate $m$ imputations, for $t = 1, \ldots, m$ we:
 
-Whether using a Bayesian or frequentist justification, the concept of validity will depend on how the missing data are imputed. We can see this directly with the Bayesian approach. 
-If the imputation model $p(X_{mis} | Y, X_{obs}, v)$ is not consistent in some manner with the analytic model $p(Y | X_{obs}, )$
+1. Draw $\gamma^{(t)} \sim p(\gamma | X_O, T, v)$
+2. Draw $X_M^{(t)} \sim p(X_M | X_O, T, v, \gamma^{(t)})$
+
+\noindent
+The remainder of this article concerns how to specify models relevant to $p(\gamma | X_O, T, v)$ for meta-regression datasets and how to sample from the distributions in steps 1 and 2.
 
 
-# Compatible Imputations
+# Compatibility
 
-As argued in the previous section, we want the imputation model $p(X_{obs} | Y, v, \gamma)$ to be appropriate. 
-There are various mathematical definitions of what *appropriate* might mean in multiple imputation, though one relevant concept is that of *compatibility*. 
-The general idea is that we are imuting values of $X | Y, v$ and then turning around and using an analytical model $Y | X, v$.  
-Suppose that $X, T$ have some joint distribution $g(X, Y | v, \eta, \gamma)$, then the imputation and analytic model are compatible if they both proceed from this joint distribution. 
-The formal definition and conditions of compatibility are set out in the Appendix.
+As noted in the previous sections, MI provides valid inferences if the imputation model is correctly specified. 
+One way the imputation model may be incorrectly specified is if it is not *compatible* with the substantive model.
+Loosely, compatibility means that if we use $T$ to predict $X$ in an imputation model and then turn around and use $X$ to predict $T$ in the meta-regression model, those two conditional models should come from the same joint distribution, and that distribution actually exists.
 
-Bartlett et al. (2015) show that a natural approach to ensuring that the imputation model is comptabile with the analytic model is to set 
+Mathematically, compatibility can be defined this way. 
+Suppose $A = [A_1, \ldots, A_p]$ is a random vector, $A_{-j} = [A_1, \ldots, A_{j-1}, A_{j + 1}, \ldots, A_{p+1}]$ is the vector that excludes  $A_j$ the $j$th element of $A$, and $B$ is some random vector.
+In the context of meta-regression $T \equiv A_1$ and $X_{j} \equiv A_{j + 1}$. 
+Denote the set of $p+1$ conditional distributions $C = \{p_j(A_j | A_{-j}, B, \lambda_j): \lambda_j \in \Lambda_j\}$. 
+The set of distributions in $C$ are said to be compatible if there exists a joint distribution $p(A | B, \lambda)$ for $\lambda \in \Lambda$ and a series of surjective maps $\{f_j: \Lambda \mapsto \Lambda_j\}$ such that
 \[
-p(X | T, v, \eta, \gamma) \propto p(Y | X, Z, \eta) p(X | v, \gamma)
+p_j(A_j | A_{-j}, B, \lambda_j) = p(A_j | A_{-j}, B, \lambda)
 \]
+for each $j$, $\lambda_j \in \Lambda_j$, and $\lambda \in f_j^{-1}(\lambda_j)$.
+A set of distributions is said to be *semi-compatible* if they can be made to be compatible by setting some of the parameter values to zero.
+Finally, a set of distributions is *valid semi-compatible* if they are semi-compatible and their joint distribution $p(A | B, \lambda)$ is correctly specified.
 
+An imputation model is correctly specified only if it is valid semi-compatible with the substantive model.
+Thus, the imputation model $p(X_M | X_O, T, v, \gamma)$ for $\gamma = [\gamma_1, \ldots, \gamma_m]$ would be valid-semi compatible with the meta-regression model $p(T | X, v, \eta)$ if $p(T | X, v, \eta)$ and $p(X_M | X_O, T, v, \gamma*)$ are compatible, where $\gamma^*$ is the vector $\gamma$ with some $\gamma_j$ set to zero, and if the meta-regression model is $p(T | X, v, \eta)$ correctly specified.
 
-
-# Example: One Missing Categorical Covariate
-
-Suppose that the meta-regression will involve only a single covariate $X$. 
-Then the resulting model is
-\[
-T_i = \beta_0 + \beta_1 X_i + u_i + e_i
-\]
-Denote $X_{obs}$ as the $X_i$ we do observe, and $X_{mis}$ as those we do not observe. 
-According to the integral in (\ref{eq:bayesjust}), the inference we are interested in requires Monte Carlo simulations of $p(X_{mis} | T, X_{obs}, v)$. 
-This means is that we require draws of $X_{mis}$ given what we know about $T, X_{obs},$ and $v$.
-Note that we can decompose this into
-\[
-p(X_{mis} | T, X_{obs}, v) = \int p(X_{mis} | \gamma, T, v) p(\gamma | T, X_{obs}, v) d\gamma
-\]
-where $\gamma$ is the parameter that describes the distribution of $X | T, v$:
-\[
-p(\gamma | T, X_{obs}, v) \propto p(X_{obs} | T, v, \gamma)  p(\gamma)
-\]
-Note that the result by Bartlett et al. implies that $\gamma = \eta$.
-
-When $X$ is categorical with $j = 1, \ldots, c$ categories, then we may model it as multinomial. 
-Using the result in () above, this means that 
+Bartlett et al. show that we can ensure a compatible imputation model of missing covariates by setting 
 \begin{equation}
-\label{eq:ex1ppd}
-P[X = k | T, v, \gamma] = \frac{p(T | X = k, v, \eta)}{\sum_{j=1}^c p(T | X = j, v, \eta)}
+p(x | X_O, T, v, \gamma) \propto p(T | x, X_O, v, \eta) p(x | X_O, v, \psi)
+\label{eq:compatible_model}
 \end{equation}
-Thus, we can generate imputations of $X_{mis}$ that are compatible with $p(T | X, v, \eta)$ by the following algorithm:
-\begin{enumerate}
-\item Draw $\eta^{(i)}$ from the posterior distribution $p(\eta | T, X_{obs}, v)$
-\item Draw $X_{mis}$ from a multinomial distribution with probabilities given in (\ref{eq:ex1ppd}).
-\end{enumerate}
-
-Note that in this algorithm, $\eta$ may corresond to $\beta_0, \beta_1$ if it is assumed $\tau^2 = 0$, or $\eta = (\beta_0, \beta_1, \tau^2$ if it is assumed $\tau^2 > 0$.
-
-**Note: when $\tau^2 = 0$ in the model, draws of $p(\beta | T, v, X)$ is pretty easy, since the posterior is normal under a flat prior. However, draws from the posterior are difficult. Is there a way to factor this? Is there a way to simplify this for the software?**
+That is, if we specify an imputation model whose likelihood is proportional to the meta-regression likelihood, that imputation model will be compatible with the meta-regression model.
+The remainder of this article applies this finding to meta-regression.
 
 
+ 
 
-# Example 2: Multiple Missing Categorical Covariates
 
-When there are multiple covariates, the model may be written as 
+# Compatible Imputations of Missing Covariates in Meta-Regression
+
+Equation (\ref{eq:compatible_model}) for a compatible imputation model actually depends on two different functions.
+First, the imputation model depends on the substantive model $p(T | x, v, \eta)$.
+Second, it depends on a model of the missing covariates given the observed covariates and the estimation variances $p(x | X_O, v, \psi)$.
+Taken together, the imputation model parameter is $\gamma = [\eta, \psi]$, which contains the parameters in the meta-regression model.
+If we treat $\eta$ and $\psi$ as independent, then sampling $\gamma^*$ from its posterior distribution is equaivalent to sampling $\eta$ from the posterior distribution $p(\eta | X_O, T, v) = p(T | X_O, v, \eta) p(\eta)$ and sampling $\psi$ from its posterior $p(x | X_O, v, \psi)p(\psi)$.
+Given a draw $\gamma^*$, we can then impute missing values by drawing $X_M^* \sim p(x | X_O, T, v, \gamma^*)$.
+
+
+## Missingness in One Covariate
+
+If there is only missingness in a single covariate $X_j$, generating imputations is relatively straightforward. 
+Samples $\eta^{(1)}, \ldots, \eta^{(m)}$ can be drawn from the posterior distribution of $p(\eta | X_{-j}, X_{jO}, T, v)$, which is equivalent to the posterior distribution when fitting the meta-regression model on complete-cases.
+Samples $\psi^{(1)}, \ldots, \psi^{(m)}$ can be drawn from the posterior distribution of $p(\psi | X_{-j}, X_{jO}, T, v)$. 
+Assuming the model $p(X_j | X_{-j}, v, \psi)$ is a linear regression for continuous $X_j$ and log-linear for categorical $X_j$, this procedure has been well-studied.
+
+Given $\gamma^{(t)} = [\eta^{(t)}, \psi^{(t)}]$, we then generate imputations by drawing $X_j^{(t)}$ for each missing $X_j$.
+Recall that the distribution of $X_j$ is proportional to $f(X_j) = p(T | X_j, X_{-j}, v, \eta^{(t)})p(X_j | X_{-j}, v, \psi^{(t)})$. 
+A rejection sampling approach can generate samples from such a distribution. 
+If we let $p(X_j | X_{-j}, v, \psi^{(t)})$ be the proposal distribution, note that $f(X_j)/p(X_j | X_{-j}, v, \psi^{(t)}) = p(T | X_j, X_{-j}, v, \eta^{(t)}) \leq 1/\sqrt{2\pi (\tau^2 + v)}$.
+Thus a rejection sampler for $X_j^{(t)}$ given a current draw of $\gamma^{(t)} = [\eta^{(t)}, \psi^{(t)}]$ would operate as follows: 
+
+1. Draw $X_j^{(t)} \sim p(X_j | X_{-j}, v, \psi^{(t)})$. 
+2. Draw $U \sim Unif[0, 1]$ as a uniform random variable on the $[0, 1]$ interval 
+3. Accept $X_j^{(t)}$ if $\sqrt{2 \pi (\tau^2 + v)}f(X_j^{(t)})/p(X_j^{(t)}) < U$
+
+Note that 
 \[
-T_i = \beta_0 + \beta_1 X_{i1} + \ldots + \beta_p X_{ip} + u_i + e_i
+\sqrt{2 \pi (\tau^2 + v)}f(X_j^{(t)})/p(X_j^{(t)}) = e^{-\frac{(T - \beta_0 - \ldots - \beta_j X_j^{(t)} - \ldots - \beta_p X_p)^2}{2(\tau^2 +  v)}}
 \]
-Let $X_j = (X_{1j}, \ldots X_{kj})$ denote the $j$th variable and $X_{-j} = \{X_1, \ldots, X_{j-1}, X_{j + 1}, \ldots, X_p\}$ denote all of the covariates *except* the $j$th variable.
-Let $X_{j, mis}$ denote the missing observations for the $j$th variable.
-
-Imputation is somewhat trickier here, since the entire the imputation of the joint distribution $p(X_1, \ldots, X_p | T, v, \gamma)$ needs to be comptible with the analytic model $p(T | X, v, \eta)$. 
-Not only are multivariate variables more difficult to work with than individual variables, but we would also need to ensure that that multivariate distribution has specific properties.
-However, as has been done in multiple imputation elsewhere, it may be simpler to break this problem down into a series of conditional distributions.
 
 
+## Missingness in Multiple Covariates: Conditional Models
+
+If there are multiple missing covariates (and potentially different missing data patterns), specifying $p(X_M | X_O, T, v, \gamma)$ becomes more difficult. 
+This is because it requires the specification of joint distributions across the $X_j$ that are missing values.
+While it may be possible to specify a joint model across all missing covariates $p(X_M | X_O, v, \psi)$ doing so in a way that takes into account different variable types of the missing $X_j$ and different missingness patterns can be cumbersome, and it is seldom obvious what type of joint distribution may be appropriate.
+
+A common way to simplify the problem of specifying a joint model is to instead use a series of conditional models. 
+Let $X_{-j} = [X_1, \ldots, X_{j-1}, X_{j + 1}, \ldots, X_p]$ be the vector $X$ that omits $X_j$.
+Then, we can specify a series of conditional models $p(X_j | X_{-j}, v, \psi_j)$ and iteratively sample from each.
+If we let $X_{jO}$ be the observed values of $X_j$ in the data, the at iteration $(t)$ we draw $\gamma_j^{(t)} \sim p(\gamma_j | X_{jO}, X_{-j}^{(t)}, T, v)$ for $j = 1, \ldots, p$, where
+\begin{equation}
+p(\gamma_j | X_{jO}, X_{-j}^{(t)}, T, v) = p(X_{jO} | X_{-j}^{(t)}, T , v, \gamma_j) p(\gamma_j)
+\label{eq:conditional_base}
+\end{equation}
+is the posterior of $\gamma_j$ given observed values of $X_j$ and all observed or imputed values of $X_{-j}$.
+So long as the $p(X_{j} | X_{-j}, v, \gamma_j)$ are valid semi-compatible, this will provide consistent MI estimates.
+
+In the algorithm above, we have not accommodated the substantive model. 
+Doing so would involve factoring the left-hand side of (\ref{eq:conditional_base}) into 
+\begin{equation}
+p(\gamma_j | X_{j}, X_{-j}^{(t)}, T, v) = p(\eta, \psi_j) p(T | X_{j}, X_{-j}^{(t)}, v, \eta) p(X_{j} | X_{-j}^{(t)}, v, \psi_j)
+\label{eq:gamma_posterior_gen}
+\end{equation}
+Again, assuming that $\psi_j \perp \eta$, we can simplify this function so that
+\begin{equation}
+p(\gamma_j | X_{j}, X_{-j}^{(t)}, T, v) = [p(\eta) p(T | X_{j}, X_{-j}^{(t)}, v, \eta)] p(\psi_j) p(X_{j} | X_{-j}^{(t)}, v, \psi_j)
+\label{eq:gamma_posterior_indep}
+\end{equation}
+Note that (\ref{eq:gamma_posterior_indep}) is the product of two posterior distributions: one for $\eta$ and one for $\psi_j$. 
+
+Based on (\ref{eq:gamma_posterior_indep}), we can generate imputations of missing covariates via an algorithm analogous to a Gibbs sampler. 
+The procedure doing so at iteration $t$ is as follows. For $j = 1, \ldots, p$:
+
+1. Draw $\psi_j^{(t)} \sim p(X_j^{(t-1)} | X_{-j}^{(t)}, v, \psi_j)p(\psi_j) = p(\psi_j | X_j^{(t-1)}, X_{-j}^{(t)}, v)$
+2. Draw $\eta^{(t)} \sim p(T | X_j{(t - 1)}, X_{-j}^{(t)}, v, \eta)p(\eta) = p(\eta | X_j^{(t-1)}, X_{-j}^{(t)}, T, v)$
+3. Draw $X_j^{(t)} \sim p(X_j | X_{-j}^{(t)}, T, v, \psi_j^{(t)}, \eta_j^{(t)}) \propto p(T | X_{j}^{(t)}, X_{-j}^{(t)}, v, \eta^{(t)}) p(X_j^{(t)} | X_{-j}^{(t)}, v, \psi_j^{(t)})$
+
+Note that the algorithm above loops through each predictor $X_j$. 
+It uses imputations for $X_j$ from the prior iteration $X_j^{(t-1)}$ and imputations of the other covariates in the current iteration $X_{-j}^{(t)}$ to compute posterior distributions in steps 1 and 2. 
+Step 3 imputes new values for missing $X_j$, denoted $X_j^{(t)}$. 
+
+The model used to generate draws of $X_j^{(t)}$ in step 3 is again written as the product of the meta-regression likelihood and the distribution function $p(X_j^{(t)} | X_{-j}^{(t)}, v, \psi_j^{(t)})$, where $p(X_j^{(t)} | X_{-j}^{(t)}, v, \psi_j^{(t)})$ is specified by the imputer. 
+The expression for this model in step 3 follows from the results of Bartlett et al., and serves to induce compatibility in the conditional imputation models. 
+To sample from this distribution, we can use the same rejection sampler discussed in the section on imputing a single covariate. 
+In this context, we use $p(X_j^{(t)} | X_{-j}^{(t)}, v, \psi_j^{(t)})$ as a proposal distribution, and accept draw with probability
+\[
+e^{-\frac{\left(T - \beta_0^{(t)} - \ldots - \beta_j^{(t)} X_j^{(t)} - \ldots - \beta_p^{(t)} X_p^{(t)}\right)^2}{2(\tau^{2(t)} +  v)}}
+\]
+
+This algorithm is consistent with a the fully conditional specification approach to multiple imputation, often referred to as multiple imputation with chained equations (MICE).
+The key adaptation is that it induces compatibility with the substantive model at each step. 
+Because the process is analogous to a Gibbs sampler, it is recommended that the algorithm cycle through all covariates numerous times as a burn-in period. 
+Typically, 10 iterations are required for burn in.
+
+Bartlett et al. argue that if the individual conditional models are valid semi-compatible and are compatible with the substantive model, then the entire process should provide valid MI inference for meta-regression.
+By using imputation models that are compatible with the substantive model at step 3 for each $X_j$, this ensures compatibility with the substantive model. 
+The conditional models will be semi-compatible with each other if they follow the same linear exponential family, such as linear regression models for $p(X_j^{(t)} | X_{-j}^{(t)}, v, \psi_j^{(t)})$ when $X_j$ is continuous, and log-linear models when $X_j$ is categorical.
+An implementation of this algorithm is included as a supplement to this article. 
 
 
-# Example 3: Multiple Mixed-Type Covariates
 
+# Simulation 1: Single Covariate
 
-# Generating Imputations
+- Single binary covariate
+- Single continuous covariate
 
+# Simulation 2: Multiple Covariates
 
-# Simulation 1: Amputing Existing Data
-
-
-# Simulation 2: Fully Simulated Data
+- 3 continuous covariates
+- 3 binary covariates
+- 2 binary and 1 continuous covariate
 
 
 # Discussion
+
+- Augment models to incorporate auxiliary variables.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- \clearpage\clearpage -->
+
+
+<!-- # Justifications for MI -->
+
+<!-- The original derivation of MI assumed a Bayesian approach to analysis (Rubin, 1987) and is explained nicely by Murray (2018).  -->
+<!-- The idea behind the Bayesian approach to MI is that we are after the posterior distribution -->
+<!-- \begin{equation} -->
+<!-- \label{eq:bayesjust} -->
+<!-- p(\eta | Y, X_{obs}, v) = \int p(\eta | Y, X_{obs}, X_{mis}, v) p(X_{mis} | Y, X_{obs}, v) dX_{mis} -->
+<!-- \end{equation} -->
+<!-- More specifically, we may wish to the posterior mean and variance: -->
+<!-- \begin{align} -->
+<!-- E[\eta | Y, X_{obs}, v] & = E[E[\eta | Y, X_{obs}, X_{mis}, v] | Y, X_{obs}, v]\\ -->
+<!-- V[\eta | Y, X_{obs}, v] & = E[V[\eta | Y, X_{obs}, X_{mis}, v] | Y, X_{obs}, v] + V[E[\eta | Y, X_{obs}, X_{mis}, v] | Y, X_{obs}, v]\\ -->
+<!-- \end{align} -->
+<!-- Generating the missing values $X_{mis}$ via Monte Carlo estimates means that the statistics involve in computing quantities in MI are Monte Carlo estimates of the posterior mean and variance.  -->
+
+<!-- From a frequentist perspective, the justification for MI assumes that inferences using the complete data are confidence valid, which means that confidence intervals have the proper coverage probabilities (i.e., a 95% CI has a 95% coverage probability).  -->
+<!-- Then, MI will also be valid if inferences based on it are also confidence valid.  -->
+<!-- Assuming that estimates of $\eta$ are (asymptotically) normal, then this would require  -->
+<!-- \begin{align} -->
+<!-- E[\hat{\eta}] & = \eta\\ -->
+<!-- E[\hat{U}] & \geq Var[\hat{\eta}] -->
+<!-- \end{align} -->
+
+<!-- Whether using a Bayesian or frequentist justification, the concept of validity will depend on how the missing data are imputed. We can see this directly with the Bayesian approach.  -->
+<!-- If the imputation model $p(X_{mis} | Y, X_{obs}, v)$ is not consistent in some manner with the analytic model $p(Y | X_{obs}, v)$ -->
+
+
+<!-- # Generating Imputations -->
+
+<!-- In order for imputations to be proper, they should be generated from a predictive model for $X$. -->
+<!-- \begin{equation} -->
+<!-- p(X_{mis} | T, X_{obs}, v) = \int p(X_{mis} | \gamma, T, v) p(\gamma | T, X_{obs}, v) d\gamma -->
+<!-- \end{equation} -->
+<!-- where $\gamma$ is the parameter that describes the distribution of $X | T, v$: -->
+<!-- \[ -->
+<!-- p(\gamma | T, X_{obs}, v) \propto p(X_{obs} | T, v, \gamma)  p(\gamma) -->
+<!-- \] -->
+
+
+<!-- # Compatible Imputations -->
+
+<!-- As argued in the previous section, we want the imputation model $p(X_{obs} | Y, v, \gamma)$ to be appropriate.  -->
+<!-- There are various mathematical definitions of what *appropriate* might mean in multiple imputation, though one relevant concept is that of *compatibility*.  -->
+<!-- The general idea behind compatibility is that we are imuting values of $X | Y, v$ and then turning around and using an analytical model $Y | X, v$, and that these models should be in synch. -->
+<!-- Suppose that $X, T$ have some joint distribution $g(X, Y | v, \eta, \gamma)$, then the imputation and analytic model are compatible if they both proceed from this joint distribution.  -->
+<!-- The formal definition and conditions of compatibility are set out in the Appendix. -->
+
+<!-- Bartlett et al. (2015) show that a natural approach to ensuring that the imputation model is comptabile with the analytic model is to set  -->
+<!-- \[ -->
+<!-- p(X | T, v, \eta, \gamma) \propto p(Y | X, \eta) p(X | v, \gamma) -->
+<!-- \] -->
+
+
+
+
+<!-- # Compatible Imputation with a Single Categorical Covariate -->
+
+<!-- Suppose that the meta-regression will involve only a single covariate $X$.  -->
+<!-- Then the resulting model is -->
+<!-- \[ -->
+<!-- T_i = \beta_0 + \beta_1 X_i + u_i + e_i -->
+<!-- \] -->
+<!-- Denote $X_{obs}$ as the $X_i$ we do observe, and $X_{mis}$ as those we do not observe.  -->
+<!-- According to the integral in (\ref{eq:bayesjust}), the inference we are interested in requires Monte Carlo simulations of $p(X_{mis} | T, X_{obs}, v)$.  -->
+<!-- This means is that we require draws of $X_{mis}$ given what we know about $T, X_{obs},$ and $v$. -->
+<!-- Note that we can decompose this into -->
+<!-- \[ -->
+<!-- p(X_{mis} | T, X_{obs}, v) = \int p(X_{mis} | \gamma, T, v) p(\gamma | T, X_{obs}, v) d\gamma -->
+<!-- \] -->
+<!-- where $\gamma$ is the parameter that describes the distribution of $X | T, v$: -->
+<!-- \[ -->
+<!-- p(\gamma | T, X_{obs}, v) \propto p(X_{obs} | T, v, \gamma)  p(\gamma) -->
+<!-- \] -->
+<!-- Note that the result by Bartlett et al. implies that $\gamma = \eta$. -->
+
+<!-- When $X$ is categorical with $j = 1, \ldots, c$ categories, then we may model it as multinomial.  -->
+<!-- Using the result in () above, this means that  -->
+<!-- \begin{equation} -->
+<!-- \label{eq:ex1ppd} -->
+<!-- P[X = k | T, v, \gamma] = \frac{p(T | X = k, v, \eta)}{\sum_{j=1}^c p(T | X = j, v, \eta)} -->
+<!-- \end{equation} -->
+<!-- Thus, we can generate imputations of $X_{mis}$ that are compatible with $p(T | X, v, \eta)$ by the following algorithm: -->
+<!-- \begin{enumerate} -->
+<!-- \item Draw $\eta^{(i)}$ from the posterior distribution $p(\eta | T, X_{obs}, v)$ -->
+<!-- \item Draw $X_{mis}$ from a multinomial distribution with probabilities given in (\ref{eq:ex1ppd}). -->
+<!-- \end{enumerate} -->
+
+<!-- Note that in this algorithm, $\eta$ may corresond to $\beta_0, \beta_1$ if it is assumed $\tau^2 = 0$, or $\eta = (\beta_0, \beta_1, \tau^2$ if it is assumed $\tau^2 > 0$. -->
+
+<!-- **Note: when $\tau^2 = 0$ in the model, draws of $p(\beta | T, v, X)$ is pretty easy, since the posterior is normal under a flat prior. However, draws from the posterior are difficult. Is there a way to factor this? Is there a way to simplify this for the software?** -->
+
+
+<!-- # Compatible Imputation with a Single Continuous Covariate -->
+
+
+<!-- # Multiple Missing Covariates: Fully Conditional Specifications -->
+
+<!-- When there are multiple covariates, the model may be written as  -->
+<!-- \[ -->
+<!-- T_i = \beta_0 + \beta_1 X_{i1} + \ldots + \beta_p X_{ip} + u_i + e_i -->
+<!-- \] -->
+<!-- Let $X_j = (X_{1j}, \ldots X_{kj})$ denote the $j$th variable and $X_{-j} = \{X_1, \ldots, X_{j-1}, X_{j + 1}, \ldots, X_p\}$ denote all of the covariates *except* the $j$th variable. -->
+<!-- Let $X_{j, mis}$ denote the missing observations for the $j$th variable. -->
+
+<!-- Imputation is somewhat trickier here, since the entire the imputation of the joint distribution $p(X_1, \ldots, X_p | T, v, \gamma)$ needs to be comptible with the analytic model $p(T | X, v, \eta)$.  -->
+<!-- Not only are multivariate variables more difficult to work with than individual variables, but we would also need to ensure that that multivariate distribution has specific properties. -->
+<!-- However, as has been done in multiple imputation elsewhere, it may be simpler to break this problem down into a series of conditional distributions. -->
+
+

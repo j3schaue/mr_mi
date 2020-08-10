@@ -20,7 +20,7 @@ bd <- bd %>%
   na.omit()
 
 ##-----------MCAR SIMS
-nsims = 2
+nsims = 100
 m = 5
 props = c(0.2, 0.5, 0.75)
 mcar_results = list()
