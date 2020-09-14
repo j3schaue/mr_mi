@@ -72,7 +72,8 @@ GetPostEta <- function(t, x, v, m = 5, fixed = TRUE){
     # fit regression mod
     mod <- metafor::rma(yi = t, vi = v,
                         mods = ~ . - t - v - study,
-                        data = dat)
+                        data = dat,
+                        method = "FE")
 
     # extract coeficient estimates and covariance matrix
     mu_vec <- coef(mod)
